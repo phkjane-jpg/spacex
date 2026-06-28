@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>지하철 교통카드 충전 키오스크 / Metro karta to'ldirish kioski</title>
+<style>
+  :root{
+    --teal-dark:#065A52;
+    --teal:#028090;
+    --seafoam:#00A896;
+    --mint-bg:#F3FBF9;
+    --mint-bg2:#E4F5F1;
+    --cta:#F4631E;
+    --cta-dark:#D9500F;
+    --cta-tint:#FFF1EA;
+    --text-dark:#15231F;
+    --text-muted:#5C7B76;
+    --line:#D8ECE7;
+    --bezel:#23282B;
+    --bezel-hi:#3A4247;
+    --ok:#0E9C6E;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:-apple-system,"Apple SD Gothic Neo","Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(0,168,150,0.25), transparent 45%),
+      radial-gradient(circle at 85% 85%, rgba(2,128,144,0.30), transparent 50%),
+      linear-gradient(160deg, #0A2624 0%, #0E3531 45%, #0A2624 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:36px 16px;
+    color:var(--text-dark);
+  }
+
+  .page-head{
+    position:fixed;
+    top:18px; left:0; right:0;
+    text-align:center;
+    color:#CFEFE9;
+    pointer-events:none;
+    z-index:2;
+  }
+  .page-head .t1{font-size:14px; font-weight:700; letter-spacing:.02em;}
+  .page-head .t2{font-size:11px; color:#7FBDB2; margin-top:2px; font-style:italic;}
+
+  /* ---------- Kiosk device chrome ---------- */
+  .kiosk-wrap{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .kiosk-bezel{
+    width:360px;
+    background:linear-gradient(160deg, var(--bezel-hi), var(--bezel) 60%);
+    border-radius:34px;
+    padding:16px 16px 26px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,0.6), 0 2px 0 rgba(255,255,255,0.04) inset;
+  }
+  .kiosk-cam{
+    width:8px; height:8px; border-radius:50%;
+    background:#0E1416;
+    box-shadow:0 0 0 3px rgba(255,255,255,0.04), inset 0 0 2px #000;
+    margin:0 auto 12px;
+  }
+  .kiosk-screen{
+    position:relative;
+    width:100%;
+    height:600px;
+    background:linear-gradient(180deg, var(--mint-bg), var(--mint-bg2));
+    border-radius:20px;
+    overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06), inset 0 2px 10px rgba(0,0,0,0.12);
+    display:flex;
+    flex-direction:column;
+  }
+  .kiosk-chin{
+    margin-top:14px;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .kiosk-slot{
+    width:120px; height:10px; border-radius:6px;
+    background:linear-gradient(180deg,#111,#000);
+    box-shadow:inset 0 1px 2px rgba(255,255,255,0.08);
+    position:relative;
+  }
+  .kiosk-led{ width:6px;height:6px;border-radius:50%; background:#1FAE7C; box-shadow:0 0 6px #1FAE7C; }
+  .kiosk-caption{
+    text-align:center; color:#6E8C86; font-size:10px; margin-top:6px; letter-spacing:.04em;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    flex:0 0 auto;
+    height:50px;
+    background:var(--teal-dark);
+    color:#fff;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 12px;
+  }
+  .topbar button.home{
+    background:rgba(255,255,255,0.12);
+    border:none; width:32px; height:32px; border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; cursor:pointer;
+  }
+  .topbar button.home svg{width:16px;height:16px;}
+  .topbar .ttl{ text-align:center; line-height:1.1; }
+  .topbar .ttl .k{font-size:13px; font-weight:700;}
+  .topbar .ttl .u{font-size:9px; color:#AFE0D6; font-style:italic;}
+  .badge{
+    font-size:9px; font-weight:700; color:var(--teal-dark);
+    background:#fff; border-radius:999px; padding:4px 8px; letter-spacing:.03em;
+  }
+
+  /* ---------- Screens ---------- */
+  .screen-area{ position:relative; flex:1; }
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    padding:22px 20px 20px;
+    opacity:0; transform:translateY(10px);
+    pointer-events:none;
+    transition:opacity .28s ease, transform .28s ease;
+    overflow-y:auto;
+  }
+  .screen.active{ opacity:1; transform:translateY(0); pointer-events:auto; }
+
+  .bi{ display:flex; flex-direction:column; gap:2px; }
+  .bi .k{ font-size:18px; font-weight:800; color:var(--text-dark); line-height:1.35;}
+  .bi .u{ font-size:11.5px; font-style:italic; color:var(--text-muted); line-height:1.3; }
+  .bi.center{ align-items:center; text-align:center; }
+  .bi.sm .k{ font-size:14px; font-weight:700; }
+  .bi.sm .u{ font-size:10px; }
+
+  /* Start screen */
+  #screen-start{ align-items:center; justify-content:center; text-align:center; gap:18px; }
+  .hero-ring{
+    width:104px; height:104px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #0BA98E, var(--teal-dark));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 14px 24px -10px rgba(6,90,82,0.55);
+  }
+  .hero-ring svg{ width:50px; height:50px; }
+  .start-btn{
+    margin-top:6px;
+    background:var(--cta);
+    color:#fff; border:none; border-radius:16px;
+    padding:16px 40px;
+    font-size:16px; font-weight:800;
+    box-shadow:0 12px 20px -8px rgba(244,99,30,0.55);
+    cursor:pointer;
+  }
+  .start-btn .u{ display:block; font-size:10px; font-weight:500; font-style:italic; color:#FFE2D2; margin-top:2px;}
+  .pulse-hint{ font-size:11px; color:var(--text-muted); font-style:italic; }
+
+  /* Amount screen */
+  .amt-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    margin-top:16px;
+  }
+  .amt-btn{
+    background:#fff; border:1.5px solid var(--line); border-radius:14px;
+    padding:14px 8px; cursor:pointer; text-align:center;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+  .amt-btn .won{ font-size:19px; font-weight:800; color:var(--text-dark); }
+  .amt-btn .lbl{ font-size:9.5px; font-family:-apple-system,sans-serif; font-style:italic; color:var(--text-muted); margin-top:3px;}
+  .amt-btn.selected{ border-color:var(--cta); background:var(--cta-tint); }
+  .amt-btn.selected .won{ color:var(--cta-dark); }
+  .amt-btn.custom{ grid-column:1 / -1; display:flex; align-items:center; justify-content:center; gap:8px; font-family:-apple-system,sans-serif;}
+  .amt-btn.custom .won{ font-size:14px; }
+
+  .balance-pill{
+    margin-top:14px; background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .balance-pill .k{font-size:12px; font-weight:700; color:var(--text-muted);}
+  .balance-pill .val{font-family:"SFMono-Regular",Consolas,monospace; font-weight:800; color:var(--teal-dark); font-size:14px;}
+
+  .spacer{ flex:1; }
+  .next-btn{
+    background:var(--teal-dark); color:#fff; border:none; border-radius:14px;
+    padding:15px; font-size:15px; font-weight:800; cursor:pointer; margin-top:14px;
+    transition:opacity .2s, transform .2s;
+  }
+  .next-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .next-btn .u{ display:block; font-size:10px; font-weight:500; font-style:italic; color:#BFE6DE; margin-top:1px;}
+
+  /* Status screen */
+  #screen-status{ align-items:center; justify-content:center; text-align:center; gap:14px; }
+  .ring-wrap{ position:relative; width:140px; height:140px; }
+  .ring-wrap svg{ width:140px; height:140px; transform:rotate(-90deg); }
+  .ring-bg{ fill:none; stroke:#E1F1ED; stroke-width:10; }
+  .ring-fg{ fill:none; stroke:var(--seafoam); stroke-width:10; stroke-linecap:round;
+    stroke-dasharray:377; stroke-dashoffset:377; transition:stroke-dashoffset .25s linear; }
+  .ring-icon{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .ring-icon svg{ width:46px; height:46px; transform:none; }
+  .status-steps{ display:flex; gap:8px; margin-top:4px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:#D8ECE7; transition:background .2s; }
+  .dot.on{ background:var(--seafoam); }
+
+  /* Complete screen */
+  #screen-complete{ align-items:center; text-align:center; gap:10px; }
+  .check-circle{
+    width:84px; height:84px; border-radius:50%; background:var(--ok);
+    display:flex; align-items:center; justify-content:center; margin:6px auto 4px;
+    box-shadow:0 12px 22px -10px rgba(14,156,110,0.55);
+  }
+  .check-circle svg{ width:42px; height:42px; }
+  .receipt{
+    width:100%; background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:14px; margin-top:10px; text-align:left;
+  }
+  .receipt-row{ display:flex; justify-content:space-between; align-items:baseline; padding:6px 0; }
+  .receipt-row + .receipt-row{ border-top:1px dashed var(--line); }
+  .receipt-row .lab .k{ font-size:11.5px; font-weight:700; color:var(--text-muted); }
+  .receipt-row .lab .u{ font-size:9px; font-style:italic; color:#93AFA9; }
+  .receipt-row .val{ font-family:"SFMono-Regular",Consolas,monospace; font-weight:800; color:var(--text-dark); font-size:14px; }
+  .receipt-row.total .val{ color:var(--teal-dark); font-size:16px; }
+
+  .travel-wish{
+    margin-top:14px; padding:16px; border-radius:14px;
+    background:linear-gradient(135deg, var(--teal-dark), var(--teal));
+    color:#fff; width:100%;
+  }
+  .travel-wish svg{ width:26px; height:26px; margin-bottom:6px; }
+  .travel-wish .k{ font-size:18px; font-weight:800; }
+  .travel-wish .u{ font-size:11px; font-style:italic; color:#BFE6DE; margin-top:3px; }
+
+  .restart-btn{
+    margin-top:14px; background:#fff; border:1.5px solid var(--teal-dark); color:var(--teal-dark);
+    border-radius:14px; padding:13px; font-size:14px; font-weight:800; cursor:pointer; width:100%;
+  }
+  .restart-btn .u{ display:block; font-size:9.5px; font-weight:500; font-style:italic; color:var(--text-muted); }
+
+  /* ---------- Keypad overlay ---------- */
+  .overlay{
+    position:absolute; inset:0; background:rgba(10,30,28,0.55);
+    display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:5;
+  }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .keypad-card{
+    width:100%; background:#fff; border-radius:20px 20px 0 0; padding:18px 18px 22px;
+    transform:translateY(12px); transition:transform .25s ease;
+  }
+  .overlay.open .keypad-card{ transform:translateY(0); }
+  .keypad-display{
+    font-family:"SFMono-Regular",Consolas,monospace; font-size:26px; font-weight:800;
+    text-align:right; padding:10px 4px; border-bottom:2px solid var(--line); color:var(--text-dark);
+  }
+  .keypad-warn{ font-size:10.5px; color:var(--cta-dark); font-style:italic; min-height:14px; margin-top:4px; text-align:right;}
+  .keys{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+  .key{
+    background:var(--mint-bg2); border:none; border-radius:12px; padding:14px 0;
+    font-size:17px; font-weight:700; color:var(--text-dark); cursor:pointer;
+  }
+  .key.fn{ background:#FBE7DF; color:var(--cta-dark); font-size:13px; }
+  .keypad-actions{ display:flex; gap:8px; margin-top:12px; }
+  .keypad-actions button{ flex:1; border:none; border-radius:12px; padding:13px; font-weight:800; cursor:pointer; }
+  .keypad-cancel{ background:var(--mint-bg2); color:var(--text-muted); }
+  .keypad-confirm{ background:var(--cta); color:#fff; }
+  .keypad-confirm:disabled{ opacity:.4; }
+
+  /* ---------- Share FAB + modal ---------- */
+  .share-fab{
+    position:fixed; right:22px; bottom:22px; z-index:20;
+    background:#fff; border:none; border-radius:18px; padding:12px 16px;
+    display:flex; align-items:center; gap:8px; cursor:pointer;
+    box-shadow:0 14px 28px -10px rgba(0,0,0,0.45);
+  }
+  .share-fab svg{ width:20px; height:20px; color:var(--teal-dark); }
+  .share-fab .lab{ text-align:left; line-height:1.1; }
+  .share-fab .lab .k{ font-size:12px; font-weight:800; color:var(--text-dark); }
+  .share-fab .lab .u{ font-size:9px; font-style:italic; color:var(--text-muted); }
+
+  .modal{
+    position:fixed; inset:0; background:rgba(8,24,22,0.65);
+    display:flex; align-items:center; justify-content:center; z-index:30;
+    opacity:0; pointer-events:none; transition:opacity .2s ease; padding:20px;
+  }
+  .modal.open{ opacity:1; pointer-events:auto; }
+  .modal-card{
+    background:#fff; border-radius:20px; padding:24px; width:min(320px,100%);
+    text-align:center; position:relative;
+    transform:scale(.96); transition:transform .2s ease;
+  }
+  .modal.open .modal-card{ transform:scale(1); }
+  .modal-close{
+    position:absolute; top:12px; right:12px; background:var(--mint-bg2); border:none;
+    width:28px; height:28px; border-radius:50%; cursor:pointer; color:var(--text-muted);
+  }
+  .modal-card img{ width:180px; height:180px; border-radius:12px; border:1px solid var(--line); margin:10px auto; }
+  .modal-url{
+    font-size:11px; word-break:break-all; background:var(--mint-bg2); border-radius:10px;
+    padding:8px 10px; color:var(--text-muted); margin-top:8px;
+  }
+  .copy-btn{
+    margin-top:12px; width:100%; background:var(--teal-dark); color:#fff; border:none;
+    border-radius:12px; padding:11px; font-weight:800; cursor:pointer;
+  }
+  .modal-note{ font-size:10px; color:#9AB3AD; margin-top:10px; line-height:1.4; }
+
+  @media (max-width:480px){
+    body{ padding:0; align-items:stretch; }
+    .page-head{ display:none; }
+    .kiosk-wrap{ width:100%; }
+    .kiosk-bezel{ width:100%; min-height:100vh; border-radius:0; padding:0; box-shadow:none; }
+    .kiosk-cam{ display:none; }
+    .kiosk-screen{ width:100%; height:100vh; border-radius:0; }
+    .kiosk-chin, .kiosk-caption{ display:none; }
+    .share-fab{ right:14px; bottom:14px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="t1">지하철 교통카드 충전 키오스크</div>
+  <div class="t2">Metro transport kartasini to'ldirish kioski</div>
+</div>
+
+<div class="kiosk-wrap">
+  <div class="kiosk-bezel">
+    <div class="kiosk-cam"></div>
+    <div class="kiosk-screen">
+
+      <div class="topbar">
+        <button class="home" id="homeBtn" aria-label="처음으로">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1v-9"/></svg>
+        </button>
+        <div class="ttl">
+          <div class="k">교통카드 충전</div>
+          <div class="u">Transport kartasini to'ldirish</div>
+        </div>
+        <div class="badge">KR · UZ</div>
+      </div>
+
+      <div class="screen-area">
+
+        <!-- Screen 1: Start -->
+        <div class="screen active" id="screen-start">
+          <div class="hero-ring">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="8" cy="14.5" r="1"/><path d="M13 14.5h5"/>
+            </svg>
+          </div>
+          <div class="bi center">
+            <div class="k">안녕하세요!</div>
+            <div class="u">Salom!</div>
+          </div>
+          <div class="bi center">
+            <div class="k">교통카드를 충전해 드릴게요.</div>
+            <div class="u">Transport kartangizni to'ldirib beramiz.</div>
+          </div>
+          <button class="start-btn" id="startBtn">
+            시작하기
+            <span class="u">Boshlash</span>
+          </button>
+          <div class="pulse-hint">화면을 터치해 주세요 · Ekranga teging</div>
+        </div>
+
+        <!-- Screen 2: Amount selection -->
+        <div class="screen" id="screen-amount">
+          <div class="bi">
+            <div class="k">충전할 금액을 선택하세요</div>
+            <div class="u">To'ldirish summasini tanlang</div>
+          </div>
+
+          <div class="amt-grid" id="amtGrid">
+            <button class="amt-btn" data-amt="1000"><div class="won">1,000원</div><div class="lbl">1,000 von</div></button>
+            <button class="amt-btn" data-amt="3000"><div class="won">3,000원</div><div class="lbl">3,000 von</div></button>
+            <button class="amt-btn" data-amt="5000"><div class="won">5,000원</div><div class="lbl">5,000 von</div></button>
+            <button class="amt-btn" data-amt="10000"><div class="won">10,000원</div><div class="lbl">10,000 von</div></button>
+            <button class="amt-btn" data-amt="30000"><div class="won">30,000원</div><div class="lbl">30,000 von</div></button>
+            <button class="amt-btn" data-amt="50000"><div class="won">50,000원</div><div class="lbl">50,000 von</div></button>
+            <button class="amt-btn custom" id="customBtn">
+              <span class="won" id="customLabel">직접 입력</span>
+              <span class="lbl" style="margin-top:0;">Boshqa summa</span>
+            </button>
+          </div>
+
+          <div class="balance-pill">
+            <span class="k">현재 잔액 · Joriy balans</span>
+            <span class="val">1,200원</span>
+          </div>
+
+          <div class="spacer"></div>
+          <button class="next-btn" id="toStatusBtn" disabled>
+            다음
+            <span class="u">Keyingi</span>
+          </button>
+        </div>
+
+        <!-- Screen 3: Charging status -->
+        <div class="screen" id="screen-status">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 140 140">
+              <circle class="ring-bg" cx="70" cy="70" r="60"/>
+              <circle class="ring-fg" id="ringFg" cx="70" cy="70" r="60"/>
+            </svg>
+            <div class="ring-icon" id="statusIcon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/></svg>
+            </div>
+          </div>
+          <div class="bi center" id="statusText">
+            <div class="k">카드를 인식하고 있습니다</div>
+            <div class="u">Karta aniqlanmoqda</div>
+          </div>
+          <div class="status-steps">
+            <span class="dot on" id="dot1"></span><span class="dot" id="dot2"></span><span class="dot" id="dot3"></span>
+          </div>
+          <div class="bi center" style="margin-top:6px;">
+            <div class="u" style="font-size:11px;">잠시만 기다려 주세요 · Iltimos, biroz kuting</div>
+          </div>
+        </div>
+
+        <!-- Screen 4: Complete -->
+        <div class="screen" id="screen-complete">
+          <div class="check-circle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17 19 7"/></svg>
+          </div>
+          <div class="bi center">
+            <div class="k">충전이 완료되었습니다!</div>
+            <div class="u">To'ldirish yakunlandi!</div>
+          </div>
+
+          <div class="receipt">
+            <div class="receipt-row">
+              <span class="lab"><span class="k">충전 금액</span><br><span class="u">To'ldirilgan summa</span></span>
+              <span class="val" id="rcptAmt">0원</span>
+            </div>
+            <div class="receipt-row total">
+              <span class="lab"><span class="k">충전 후 잔액</span><br><span class="u">Yangi balans</span></span>
+              <span class="val" id="rcptBal">0원</span>
+            </div>
+          </div>
+
+          <div class="travel-wish">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 12l5-5M3 12l5 5"/><path d="M21 12a9 9 0 1 0-9 9"/></svg>
+            <div class="k">즐거운 여행 되세요!</div>
+            <div class="u">Yaxshi sayohat tilaymiz!</div>
+          </div>
+
+          <button class="restart-btn" id="restartBtn">
+            처음으로
+            <span class="u">Boshidan boshlash</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Keypad overlay (contained within the kiosk screen) -->
+      <div class="overlay" id="keypadOverlay">
+        <div class="keypad-card">
+          <div class="bi sm" style="margin-bottom:6px;">
+            <div class="k">충전 금액을 입력하세요</div>
+            <div class="u">To'ldirish summasini kiriting</div>
+          </div>
+          <div class="keypad-display" id="keypadDisplay">0원</div>
+          <div class="keypad-warn" id="keypadWarn"></div>
+          <div class="keys">
+            <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+            <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+            <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+            <button class="key fn" data-k="clear">지우기<br>Tozalash</button>
+            <button class="key" data-k="0">0</button>
+            <button class="key fn" data-k="back">⌫</button>
+          </div>
+          <div class="keypad-actions">
+            <button class="keypad-cancel" id="keypadCancel">취소 · Bekor</button>
+            <button class="keypad-confirm" id="keypadConfirm" disabled>확인 · Tasdiqlash</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kiosk-chin">
+      <span class="kiosk-led"></span>
+      <div class="kiosk-slot"></div>
+    </div>
+    <div class="kiosk-caption">CARD TAG AREA · 카드 인식부</div>
+  </div>
+</div>
+
+<!-- Share FAB -->
+<button class="share-fab" id="shareFab">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5"/></svg>
+  <span class="lab"><span class="k">공유하기</span><br><span class="u">Ulashish</span></span>
+</button>
+
+<div class="modal" id="shareModal">
+  <div class="modal-card">
+    <button class="modal-close" id="modalClose">✕</button>
+    <div class="bi center">
+      <div class="k" style="font-size:15px;">휴대폰으로 보기</div>
+      <div class="u">Telefoningizda ko'ring</div>
+    </div>
+    <img id="qrImg" alt="QR code">
+    <div class="modal-url" id="urlText"></div>
+    <button class="copy-btn" id="copyBtn">주소 복사 · Manzilni nusxalash</button>
+    <div class="modal-note">QR 코드를 스캔하거나 주소를 복사해 다른 기기에서 열어보세요.<br>QR kodni skanerlang yoki manzilni nusxalab boshqa qurilmada oching.</div>
+  </div>
+</div>
+
+<script>
+  const screens = ["screen-start","screen-amount","screen-status","screen-complete"];
+  function showScreen(id){
+    screens.forEach(s => document.getElementById(s).classList.toggle("active", s === id));
+  }
+
+  let selectedAmount = 0;
+  let currentBalance = 1200;
+  const fmt = n => n.toLocaleString("ko-KR") + "원";
+  const fmtUz = n => n.toLocaleString("en-US") + " von";
+
+  // ---- Start ----
+  document.getElementById("startBtn").addEventListener("click", () => showScreen("screen-amount"));
+  document.getElementById("homeBtn").addEventListener("click", resetApp);
+
+  // ---- Amount grid ----
+  const amtButtons = Array.from(document.querySelectorAll(".amt-btn:not(.custom)"));
+  const customBtn = document.getElementById("customBtn");
+  const customLabel = document.getElementById("customLabel");
+  const nextBtn = document.getElementById("toStatusBtn");
+
+  function selectPreset(btn){
+    amtButtons.forEach(b => b.classList.remove("selected"));
+    customBtn.classList.remove("selected");
+    btn.classList.add("selected");
+    selectedAmount = parseInt(btn.dataset.amt, 10);
+    customLabel.textContent = "직접 입력";
+    nextBtn.disabled = false;
+  }
+  amtButtons.forEach(b => b.addEventListener("click", () => selectPreset(b)));
+
+  // ---- Custom keypad ----
+  const keypadOverlay = document.getElementById("keypadOverlay");
+  const keypadDisplay = document.getElementById("keypadDisplay");
+  const keypadWarn = document.getElementById("keypadWarn");
+  const keypadConfirm = document.getElementById("keypadConfirm");
+  let keypadValue = "";
+
+  function refreshKeypad(){
+    const n = keypadValue === "" ? 0 : parseInt(keypadValue, 10);
+    keypadDisplay.textContent = fmt(n);
+    if (n > 0 && n < 100){
+      keypadWarn.textContent = "100원 이상 입력해주세요 · 100 vondan ko'p kiriting";
+      keypadConfirm.disabled = true;
+    } else if (n > 100000){
+      keypadWarn.textContent = "100,000원 이하로 입력해주세요 · 100,000 vondan kam kiriting";
+      keypadConfirm.disabled = true;
+    } else {
+      keypadWarn.textContent = "";
+      keypadConfirm.disabled = n <= 0;
+    }
+  }
+  customBtn.addEventListener("click", () => {
+    keypadValue = "";
+    refreshKeypad();
+    keypadOverlay.classList.add("open");
+  });
+  document.querySelectorAll(".key").forEach(k => {
+    k.addEventListener("click", () => {
+      const v = k.dataset.k;
+      if (v === "clear") keypadValue = "";
+      else if (v === "back") keypadValue = keypadValue.slice(0, -1);
+      else if (keypadValue.length < 6) keypadValue += v;
+      refreshKeypad();
+    });
+  });
+  document.getElementById("keypadCancel").addEventListener("click", () => keypadOverlay.classList.remove("open"));
+  keypadConfirm.addEventListener("click", () => {
+    const n = parseInt(keypadValue, 10);
+    amtButtons.forEach(b => b.classList.remove("selected"));
+    customBtn.classList.add("selected");
+    customLabel.textContent = fmt(n);
+    selectedAmount = n;
+    nextBtn.disabled = false;
+    keypadOverlay.classList.remove("open");
+  });
+
+  // ---- Status sequence ----
+  const ringFg = document.getElementById("ringFg");
+  const statusText = document.getElementById("statusText");
+  const statusIcon = document.getElementById("statusIcon");
+  const dots = [document.getElementById("dot1"), document.getElementById("dot2"), document.getElementById("dot3")];
+  const CIRC = 377;
+  let statusTimers = [];
+
+  const ICONS = {
+    card: '<svg viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/></svg>',
+    pay: '<svg viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5c0-1.4 1.3-2.5 3-2.5s3 1 3 2.2c0 2.8-6 1.6-6 4.4 0 1.3 1.3 2.4 3 2.4s3-1 3-2.4"/></svg>',
+    charge: '<svg viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>'
+  };
+
+  function clearStatusTimers(){ statusTimers.forEach(t => clearTimeout(t)); statusTimers = []; }
+
+  function setRing(pct){ ringFg.style.strokeDashoffset = CIRC - (CIRC * pct / 100); }
+
+  function runStatusSequence(){
+    clearStatusTimers();
+    setRing(0);
+    dots.forEach(d => d.classList.remove("on"));
+
+    statusIcon.innerHTML = ICONS.card;
+    statusText.innerHTML = '<div class="k">카드를 인식하고 있습니다</div><div class="u">Karta aniqlanmoqda</div>';
+    dots[0].classList.add("on");
+    setRing(20);
+
+    statusTimers.push(setTimeout(() => {
+      statusIcon.innerHTML = ICONS.pay;
+      statusText.innerHTML = '<div class="k">결제를 처리하고 있습니다</div><div class="u">To\'lov amalga oshirilmoqda</div>';
+      dots[1].classList.add("on");
+      setRing(55);
+    }, 1100));
+
+    statusTimers.push(setTimeout(() => {
+      statusIcon.innerHTML = ICONS.charge;
+      statusText.innerHTML = '<div class="k">충전 중입니다</div><div class="u">To\'ldirilmoqda</div>';
+      dots[2].classList.add("on");
+      setRing(100);
+    }, 2200));
+
+    statusTimers.push(setTimeout(() => {
+      currentBalance += selectedAmount;
+      document.getElementById("rcptAmt").textContent = fmt(selectedAmount);
+      document.getElementById("rcptBal").textContent = fmt(currentBalance);
+      showScreen("screen-complete");
+    }, 3300));
+  }
+
+  nextBtn.addEventListener("click", () => {
+    showScreen("screen-status");
+    runStatusSequence();
+  });
+
+  // ---- Restart ----
+  document.getElementById("restartBtn").addEventListener("click", resetApp);
+
+  function resetApp(){
+    clearStatusTimers();
+    selectedAmount = 0;
+    amtButtons.forEach(b => b.classList.remove("selected"));
+    customBtn.classList.remove("selected");
+    customLabel.textContent = "직접 입력";
+    nextBtn.disabled = true;
+    keypadOverlay.classList.remove("open");
+    showScreen("screen-start");
+  }
+
+  // ---- Share modal ----
+  const shareModal = document.getElementById("shareModal");
+  const qrImg = document.getElementById("qrImg");
+  const urlText = document.getElementById("urlText");
+
+  document.getElementById("shareFab").addEventListener("click", () => {
+    const url = window.location.href;
+    qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=" + encodeURIComponent(url);
+    urlText.textContent = url;
+    shareModal.classList.add("open");
+  });
+  document.getElementById("modalClose").addEventListener("click", () => shareModal.classList.remove("open"));
+  shareModal.addEventListener("click", (e) => { if (e.target === shareModal) shareModal.classList.remove("open"); });
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("copyBtn");
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      btn.textContent = "복사되었습니다 · Nusxalandi";
+    } catch (e) {
+      btn.textContent = "복사 실패 · Xato yuz berdi";
+    }
+    setTimeout(() => { btn.textContent = "주소 복사 · Manzilni nusxalash"; }, 1800);
+  });
+</script>
+</body>
+</html>
